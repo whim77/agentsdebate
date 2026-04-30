@@ -88,6 +88,7 @@ export function Sidebar({ activeNav, onNav, onNewDebate }: SidebarProps) {
       {/* Bottom nav */}
       <div style={{ borderTop: '1px solid #E5E7F3', padding: '8px 12px' }}>
         {[
+          { icon: <ChatIcon />, label: '채팅',     id: 'chat' },
           { icon: <GearIcon />, label: '모델 설정', id: 'settings' },
           { icon: <BarIcon />,  label: '통계',     id: 'stats' },
         ].map((item) => (
@@ -110,6 +111,14 @@ export function Sidebar({ activeNav, onNav, onNewDebate }: SidebarProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
   );
 }
 
