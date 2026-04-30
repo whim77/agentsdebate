@@ -7,3 +7,5 @@ node_modules/
 .playwright-mcp/
 extracted/
 AgentsDebate-handoff.zip
+*.png
+tsconfig.tsbuildinfo
