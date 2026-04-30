@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentsDebate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:            #F3F5F6;
+    --surface:       rgba(255,255,255,0.85);
+    --surface-solid: #FFFFFF;
+    --purple-primary:#9F9DF3;
+    --purple-accent: #767DFF;
+    --purple-soft:   #EBECFF;
+    --purple-light:  #D0CFFA;
+    --text-primary:  #191C32;
+    --text-dark:     #26273C;
+    --text-muted:    #93949A;
+    --text-inactive: #CED0DE;
+    --separator:     #E5E7F3;
+    --green:         #5FC88F;
+    --pink:          #F04086;
+    --blue-accent:   #66B6FF;
+    --shadow-card:   0px 20px 60px 0px rgba(55,62,125,0.05);
+    --shadow-btn:    0 4px 16px rgba(159,157,243,0.3);
+    --radius-card:   25px;
+    --radius-btn:    40px;
+    --font:          'Poppins', sans-serif;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: var(--font);
+    background: #E5E7F3;
+  }
+
+  #root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  * { scrollbar-width: thin; scrollbar-color: rgba(55,62,125,0.12) transparent; }
+  *::-webkit-scrollbar { width: 5px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: rgba(55,62,125,0.12); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+/* ─────────────────────────────────────────────
+   MODELS + SHARED PRIMITIVES
+   ───────────────────────────────────────────── */
+const MODELS = [
+  { id:'gpt',    name:'ChatGPT', abbr:'G',  color:'#767DFF', bg:'#EBECFF' },
+  { id:'claude', name:'Claude',  abbr:'C',  color:'#F04086', bg:'#FFE0EE' },
+  { id:'gemini', name:'Gemini',  abbr:'Gm', color:'#5FC88F', bg:'#CAEDCB' },
+  { id:'local',  name:'Llama 3', abbr:'L',  color:'#66B6FF', bg:'#D4E5FF' },
+];
+
+function ModelPill({ model, size = 28 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: model.bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.35, fontWeight: 700, color: model.color,
+      flexShrink: 0, userSelect: 'none',
+    }}>{model.abbr}</div>
+  );
+}
+
+function BlurCircle({ color, size, top, left, right, bottom, opacity = 0.5 }) {
+  return (
+    <div style={{
+      position: 'absolute', width: size, height: size, borderRadius: '50%',
+      background: color, filter: 'blur(60px)', opacity,
+      top, left, right, bottom, pointerEvents: 'none', zIndex: 0,
+    }} />
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SIDEBAR
+   ───────────────────────────────────────────── */
+const HIST = [
+  { title: 'AGI는 2030년에 달성될까?',  models: ['gpt','claude','gemini'], active: true },
+  { title: '원격근무 vs 오피스 근무',    models: ['gpt','claude'] },
+  { title: '기후변화 대응 방안',         models: ['gpt','claude','gemini','local'] },
+  { title: '블록체인의 미래',            models: ['claude','gemini'] },
+  { title: 'AI 규제의 방향',            models: ['gpt','local'] },
+];
+
+function ErdSidebar({ activeNav, onNav }) {
+  const modelMap = Object.fromEntries(MODELS.map(m => [m.id, m]));
+  return (
+    <div style={{
+      width: 220, flexShrink: 0, background: '#FFFFFF',
+      boxShadow: '1px 0 0 #E5E7F3',
+      display: 'flex', flexDirection: 'column', height: '100%',
+    }}>
+      {/* Logo */}
+      <div style={{ padding: '22px 20px 16px', borderBottom: '1px solid #E5E7F3' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 14,
+            background: '#9F9DF3',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: 13, color: '#fff', letterSpacing: -0.5,
+            flexShrink: 0,
+          }}>AD</div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#191C32', lineHeight: 1.2 }}>AgentsDebate</div>
+            <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>AI 토론 플랫폼</div>
+          </div>
+        </div>
+      </div>
+
+      {/* New debate button */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7F3' }}>
+        <div
+          onClick={() => onNav('chat')}
+          style={{
+            background: '#9F9DF3',
+            borderRadius: 40, padding: '9px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            cursor: 'pointer', boxShadow: '0 4px 16px rgba(159,157,243,0.35)',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M7 1v12M1 7h12"/>
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>새 토론 시작</span>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #E5E7F3' }}>
+        <div style={{
+          background: '#F3F5F6', borderRadius: 40, padding: '8px 14px',
+          display: 'flex', alignItems: 'center', gap: 7,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93949A" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#93949A' }}>토론 검색</span>
+        </div>
+      </div>
+
+      {/* History */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', padding: '0 4px', marginBottom: 6 }}>최근 토론</div>
+        {HIST.map((item, i) => (
+          <div
+            key={i}
+            onClick={() => onNav('chat')}
+            style={{
+              padding: '9px 10px', borderRadius: 14, marginBottom: 4, cursor: 'pointer',
+              background: item.active && activeNav === 'chat' ? '#EBECFF' : 'transparent',
+            }}
+          >
+            <div style={{
+              fontSize: 12, fontWeight: item.active && activeNav === 'chat' ? 700 : 500,
+              color: item.active && activeNav === 'chat' ? '#767DFF' : '#191C32',
+              marginBottom: 5, lineHeight: 1.35,
+            }}>{item.title}</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {item.models.map((mid, j) => <ModelPill key={j} model={modelMap[mid]} size={18} />)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom nav */}
+      <div style={{ borderTop: '1px solid #E5E7F3', padding: '8px 12px' }}>
+        {[
+          {
+            label: '모델 설정', id: 'settings',
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            ),
+          },
+          {
+            label: '통계', id: 'stats',
+            icon: (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+            ),
+          },
+        ].map((item) => (
+          <div
+            key={item.id}
+            onClick={() => onNav(item.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px',
+              borderRadius: 12, cursor: 'pointer',
+              background: activeNav === item.id ? '#EBECFF' : 'transparent',
+              color: activeNav === item.id ? '#767DFF' : '#191C32',
+            }}
+          >
+            <span style={{ color: activeNav === item.id ? '#767DFF' : '#93949A', display: 'flex' }}>{item.icon}</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{item.label}</span>
+          </div>
+        ))}
+        <div style={{ margin: '6px 0', height: 1, background: '#E5E7F3' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px' }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%', background: '#D0CFFA',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: '#767DFF', flexShrink: 0,
+          }}>U</div>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#191C32' }}>사용자</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   CHAT SCREEN
+   ───────────────────────────────────────────── */
+function RoundLabel({ num, label, state }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px' }}>
+      <div style={{
+        padding: '3px 12px', borderRadius: 40, flexShrink: 0,
+        background: state === 'active' ? '#9F9DF3' : state === 'done' ? '#5FC88F' : '#F3F5F6',
+        fontSize: 11, fontWeight: 700,
+        color: state === 'pending' ? '#CED0DE' : '#fff',
+      }}>라운드 {num}</div>
+      <span style={{ fontSize: 12, fontWeight: 500, color: '#93949A', flexShrink: 0 }}>{label}</span>
+      {state === 'done' && (
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#5FC88F" strokeWidth="2" strokeLinecap="round">
+          <path d="M2 6l3 3 5-5"/>
+        </svg>
+      )}
+      {state === 'active' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#9F9DF3' }} />
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#9F9DF3' }}>진행 중</span>
+        </div>
+      )}
+      <div style={{ flex: 1, height: 1, background: '#E5E7F3' }} />
+    </div>
+  );
+}
+
+function AgreeBar({ agree, disagree }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+      {agree > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '3px 10px', borderRadius: 40,
+          background: '#E8FFF3', fontSize: 11, fontWeight: 500, color: '#5FC88F',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5FC88F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+            <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+          </svg>
+          <span>동의 {agree}</span>
+        </div>
+      )}
+      {disagree > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '3px 10px', borderRadius: 40,
+          background: '#FFF0F5', fontSize: 11, fontWeight: 500, color: '#F04086',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F04086" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+            <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+          </svg>
+          <span>반론 {disagree}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TypingDots() {
+  const [frame, setFrame] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setFrame(f => (f + 1) % 4), 500);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{
+      background: '#F3F5F6', borderRadius: '0 18px 18px 18px',
+      padding: '12px 16px', display: 'inline-flex', gap: 5, alignItems: 'center',
+    }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{
+          width: 7, height: 7, borderRadius: '50%',
+          background: frame > i ? '#9F9DF3' : '#CED0DE',
+          transition: 'background 0.2s',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+function ChatBubble({ model, text, agree, disagree, refTag, typing }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+      <ModelPill model={model} size={32} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: model.color }}>{model.name}</span>
+          {refTag && (
+            <span style={{
+              fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 40,
+              background: '#E8FFF3', color: '#5FC88F',
+            }}>↩ {refTag}</span>
+          )}
+        </div>
+        {typing ? (
+          <TypingDots />
+        ) : (
+          <>
+            <div style={{
+              background: '#FFFFFF', borderRadius: '0 18px 18px 18px',
+              padding: '10px 14px', fontSize: 13, fontWeight: 500, color: '#191C32',
+              lineHeight: 1.6, boxShadow: '0 2px 12px rgba(55,62,125,0.06)',
+            }}>{text}</div>
+            {(agree > 0 || disagree > 0) && <AgreeBar agree={agree} disagree={disagree} />}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RoundConclusion({ num, text }) {
+  return (
+    <div style={{
+      margin: '8px 0 4px',
+      background: '#191C32',
+      borderRadius: 18, padding: '12px 16px',
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 500, color: '#9F9DF3', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9F9DF3" strokeWidth="2" strokeLinecap="round">
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+          <line x1="4" y1="22" x2="4" y2="15"/>
+        </svg>
+        라운드 {num} 중간 결론
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#D0CFFA', lineHeight: 1.6 }}>{text}</div>
+    </div>
+  );
+}
+
+function ErdChatScreen() {
+  const modelMap = Object.fromEntries(MODELS.map(m => [m.id, m]));
+  const [paused, setPaused] = React.useState(false);
+
+  const rounds = [
+    {
+      num: 1, label: '초기 입장 표명', state: 'done',
+      messages: [
+        { mid: 'gpt',    text: '현재 AI 발전 추세를 감안하면 2030년 AGI 완전 달성은 어렵습니다. 추론 능력과 자기 개선 메커니즘이 아직 미성숙합니다.', agree: 1, disagree: 2 },
+        { mid: 'claude', text: '"AGI"의 정의 자체가 불명확합니다. 특정 벤치마크 기준이라면 부분적 달성은 이미 진행 중이라 볼 수 있습니다.', agree: 2, disagree: 0 },
+        { mid: 'gemini', text: '멀티모달·에이전트 기술의 급격한 발전을 고려하면 2030년은 현실적인 목표입니다. 에너지 비용이 핵심 병목입니다.', agree: 1, disagree: 1 },
+      ],
+      conclusion: '합의: "AGI" 정의 명확화 필요. 부분 달성 가능성 높음. 완전한 범용성은 2030년 달성 어려움.',
+    },
+    {
+      num: 2, label: '반론 및 심화', state: 'active',
+      messages: [
+        { mid: 'gpt', text: 'Claude의 정의 불명확 지적에 동의합니다. 실질적 배포 가능성까지 함께 고려해야 합니다.', agree: 2, disagree: 0, refTag: 'Claude에 동의' },
+        { mid: 'claude', typing: true },
+      ],
+    },
+    { num: 3, label: '공통점 탐색', state: 'pending' },
+    { num: 4, label: '최종 입장', state: 'pending' },
+    { num: 5, label: '결론 도출', state: 'pending' },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: '#F3F5F6', position: 'relative', overflow: 'hidden' }}>
+      <BlurCircle color="#E8D5FF" size={220} top={-60} right={-40} />
+      <BlurCircle color="#FFDABF" size={180} bottom={40} left={-60} opacity={0.4} />
+
+      {/* Header */}
+      <div style={{
+        padding: '14px 20px 12px',
+        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid #E5E7F3',
+        position: 'relative', zIndex: 1, flexShrink: 0,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#191C32', marginBottom: 7 }}>
+          "AGI는 2030년까지 달성 가능한가?"
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {MODELS.map((m, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px',
+              borderRadius: 40, background: m.bg,
+            }}>
+              <ModelPill model={m} size={16} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: m.color }}>{m.name}</span>
+            </div>
+          ))}
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginLeft: 4 }}>라운드 2 / 5</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <div
+              onClick={() => setPaused(p => !p)}
+              style={{
+                padding: '4px 12px', borderRadius: 40,
+                background: paused ? '#EBECFF' : '#F3F5F6',
+                fontSize: 11, fontWeight: 500,
+                color: paused ? '#767DFF' : '#26273C',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              {paused ? (
+                <>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg>
+                  재개
+                </>
+              ) : (
+                <>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="3" height="8" rx="1"/><rect x="6" y="1" width="3" height="8" rx="1"/></svg>
+                  중지
+                </>
+              )}
+            </div>
+            <div style={{
+              padding: '4px 12px', borderRadius: 40, background: '#F3F5F6',
+              fontSize: 11, fontWeight: 500, color: '#26273C', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+              </svg>
+              재시작
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px', position: 'relative', zIndex: 1 }}>
+        {rounds.map((round, ri) => (
+          <div key={ri}>
+            <RoundLabel num={round.num} label={round.label} state={round.state} />
+            {round.messages && round.messages.map((msg, mi) => (
+              <ChatBubble
+                key={mi}
+                model={modelMap[msg.mid]}
+                text={msg.text}
+                agree={msg.agree}
+                disagree={msg.disagree}
+                refTag={msg.refTag}
+                typing={msg.typing}
+              />
+            ))}
+            {round.conclusion && <RoundConclusion num={round.num} text={round.conclusion} />}
+          </div>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div style={{
+        padding: '10px 20px 14px',
+        background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)',
+        borderTop: '1px solid #E5E7F3',
+        position: 'relative', zIndex: 1, flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ flex: 1, background: '#F3F5F6', borderRadius: 40, padding: '10px 18px' }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#CED0DE' }}>새 토론 주제 또는 후속 질문 입력...</span>
+          </div>
+          <div style={{
+            padding: '10px 20px', borderRadius: 40,
+            background: '#9F9DF3',
+            fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(159,157,243,0.3)', flexShrink: 0,
+          }}>토론 시작</div>
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 500, textAlign: 'center', color: '#CED0DE', marginTop: 6 }}>
+          Enter · 라운드 로빈 자동 진행 · 라운드별 중간 결론 자동 생성
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SETTINGS SCREEN
+   ───────────────────────────────────────────── */
+function Toggle({ enabled, onChange }) {
+  return (
+    <div
+      onClick={onChange}
+      style={{
+        width: 38, height: 22, borderRadius: 40,
+        background: enabled ? '#767DFF' : '#E5E7F3',
+        position: 'relative', cursor: 'pointer', flexShrink: 0,
+        transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+        position: 'absolute', top: 3,
+        left: enabled ? 18 : 4,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+        transition: 'left 0.2s',
+      }} />
+    </div>
+  );
+}
+
+function TempSlider({ value, color }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 4, background: '#E5E7F3', borderRadius: 4, position: 'relative' }}>
+        <div style={{ width: `${value * 100}%`, height: '100%', background: color, borderRadius: 4 }} />
+        <div style={{
+          width: 12, height: 12, borderRadius: '50%', background: color,
+          border: '2px solid #fff', boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+          position: 'absolute', top: -4, left: `calc(${value * 100}% - 6px)`,
+        }} />
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 700, color, width: 28, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function RoleSelector({ selected, color, onChange }) {
+  const roles = ['찬성', '반대', '중립', '자유'];
+  return (
+    <div style={{ display: 'flex', gap: 0, background: '#F3F5F6', borderRadius: 40, padding: 3 }}>
+      {roles.map((role, i) => (
+        <div
+          key={i}
+          onClick={() => onChange && onChange(role)}
+          style={{
+            padding: '3px 10px', borderRadius: 40, cursor: 'pointer',
+            background: selected === role ? '#fff' : 'transparent',
+            fontSize: 11, fontWeight: selected === role ? 700 : 500,
+            color: selected === role ? color : '#93949A',
+            boxShadow: selected === role ? '0 1px 4px rgba(55,62,125,0.1)' : 'none',
+          }}
+        >{role}</div>
+      ))}
+    </div>
+  );
+}
+
+function ModelCard({ model, role, temp, enabled, apiKey, isLocal, endpoint, prompt, onToggle }) {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 20,
+      boxShadow: '0 4px 20px rgba(55,62,125,0.06)',
+      padding: '14px 16px', opacity: enabled ? 1 : 0.55,
+      border: `1.5px solid ${enabled ? model.bg : '#E5E7F3'}`,
+      transition: 'opacity 0.2s, border-color 0.2s',
+    }}>
+      {/* Top row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <ModelPill model={model} size={36} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#191C32' }}>{model.name}</div>
+          {isLocal && <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>Local LLM · Ollama</div>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>{enabled ? '활성' : '비활성'}</span>
+          <Toggle enabled={enabled} onChange={onToggle} />
+        </div>
+      </div>
+
+      {/* Role + Temperature */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 5 }}>역할</div>
+          <RoleSelector selected={role} color={model.color} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 6 }}>Temperature</div>
+          <TempSlider value={temp} color={model.color} />
+        </div>
+      </div>
+
+      {/* API / Endpoint */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 4 }}>
+          {isLocal ? 'Endpoint URL' : 'API Key'}
+        </div>
+        <div style={{
+          background: '#F3F5F6', borderRadius: 12, padding: '8px 12px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>
+            {isLocal ? endpoint : apiKey}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#767DFF', cursor: 'pointer' }}>
+            {isLocal ? '테스트' : '변경'}
+          </span>
+        </div>
+      </div>
+
+      {/* System prompt */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 4 }}>시스템 프롬프트</div>
+        <div style={{
+          background: '#F3F5F6', borderRadius: 12, padding: '8px 12px',
+          fontSize: 11, fontWeight: 500, color: prompt ? '#191C32' : '#CED0DE',
+          lineHeight: 1.5, minHeight: 36,
+        }}>
+          {prompt || '기본 프롬프트 사용'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErdSettingsScreen() {
+  const [configs, setConfigs] = React.useState([
+    { ...MODELS[0], role:'반대', temp:0.7, enabled:true,  apiKey:'sk-●●●●●●●●●●●●', prompt:'반대 입장에서 논리적으로 반박하세요.' },
+    { ...MODELS[1], role:'찬성', temp:0.8, enabled:true,  apiKey:'sk-ant-●●●●●●', prompt:'찬성 입장을 명확한 근거로 지지하세요.' },
+    { ...MODELS[2], role:'중립', temp:0.9, enabled:true,  apiKey:'AIza●●●●●●●●',  prompt:'중립적으로 양측을 분석하세요.' },
+    { ...MODELS[3], role:'자유', temp:1.0, enabled:false, isLocal:true, endpoint:'http://localhost:11434', prompt:'' },
+  ]);
+
+  const toggleModel = (i) => setConfigs(cs => cs.map((c, j) => j === i ? { ...c, enabled: !c.enabled } : c));
+
+  const presets = [
+    { name:'GPT-4o',     sub:'OpenAI',      color:'#767DFF' },
+    { name:'Claude 3.5', sub:'Anthropic',   color:'#F04086' },
+    { name:'Gemini 2.0', sub:'Google',      color:'#5FC88F' },
+    { name:'Grok 2',     sub:'xAI',         color:'#191C32' },
+    { name:'Mistral',    sub:'Mistral AI',  color:'#66B6FF' },
+    { name:'DeepSeek',   sub:'DeepSeek',    color:'#9F9DF3' },
+  ];
+
+  const debateSettings = [
+    { label:'라운드 수',           val:'5' },
+    { label:'라운드당 최대 토큰',   val:'500' },
+    { label:'결론 도출',           val:'AI 자동 합산' },
+    { label:'응답 언어',           val:'한국어' },
+    { label:'진행 방식',           val:'라운드 로빈' },
+  ];
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: '#F3F5F6', overflow: 'hidden', position: 'relative' }}>
+      <BlurCircle color="#E8D5FF" size={200} top={-50} right={-30} />
+      <BlurCircle color="#FFDABF" size={160} bottom={60} left={-50} opacity={0.4} />
+
+      {/* Header */}
+      <div style={{
+        padding: '14px 20px 12px',
+        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid #E5E7F3',
+        zIndex: 1, flexShrink: 0, position: 'relative',
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#191C32', marginBottom: 2 }}>모델 관리</div>
+        <div style={{ fontSize: 12, fontWeight: 500, color: '#93949A' }}>토론 참여 AI 모델 추가 · 설정 · 역할 지정</div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', gap: 12, position: 'relative', zIndex: 1 }}>
+
+        {/* Model cards — 2 column grid */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignContent: 'start' }}>
+          <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#191C32' }}>
+              활성 모델 ({configs.filter(c => c.enabled).length}/{configs.length})
+            </span>
+            <div style={{
+              padding: '5px 14px', borderRadius: 40, background: '#EBECFF',
+              fontSize: 12, fontWeight: 700, color: '#767DFF', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="#767DFF" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M5.5 1v9M1 5.5h9"/>
+              </svg>
+              모델 추가
+            </div>
+          </div>
+          {configs.map((cfg, i) => (
+            <ModelCard key={i} model={cfg} {...cfg} onToggle={() => toggleModel(i)} />
+          ))}
+        </div>
+
+        {/* Right panel */}
+        <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+          {/* Presets */}
+          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 4px 20px rgba(55,62,125,0.06)', padding: '14px 14px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#191C32', marginBottom: 10 }}>프리셋 모델</div>
+            {presets.map((p, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '6px 0',
+                borderBottom: i < presets.length - 1 ? '1px solid #E5E7F3' : 'none',
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: p.color }}>{p.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>{p.sub}</div>
+                </div>
+                <div style={{
+                  padding: '3px 10px', borderRadius: 40, background: '#EBECFF',
+                  fontSize: 11, fontWeight: 700, color: '#767DFF', cursor: 'pointer',
+                }}>+ 추가</div>
+              </div>
+            ))}
+
+            {/* Local LLM */}
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E5E7F3' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#191C32', marginBottom: 8 }}>Local LLM</div>
+              {[
+                { label: '모델 이름',       ph: '예: Llama 3' },
+                { label: 'Endpoint URL',    ph: 'http://localhost:11434' },
+                { label: 'API Key (선택)',   ph: '없으면 비워두세요' },
+              ].map(({ label, ph }, i) => (
+                <div key={i} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 3 }}>{label}</div>
+                  <div style={{ background: '#F3F5F6', borderRadius: 10, padding: '7px 10px', fontSize: 11, fontWeight: 500, color: '#CED0DE' }}>
+                    {ph}
+                  </div>
+                </div>
+              ))}
+              <div style={{
+                padding: '7px 0', borderRadius: 40, background: '#9F9DF3',
+                textAlign: 'center', fontSize: 12, fontWeight: 700, color: '#fff',
+                cursor: 'pointer', marginTop: 4,
+              }}>
+                + Local LLM 추가
+              </div>
+            </div>
+          </div>
+
+          {/* Debate settings */}
+          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 4px 20px rgba(55,62,125,0.06)', padding: '14px 14px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#191C32', marginBottom: 10 }}>토론 설정</div>
+            {debateSettings.map((s, i) => (
+              <div key={i} style={{ marginBottom: 7 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', marginBottom: 3 }}>{s.label}</div>
+                <div style={{
+                  background: '#F3F5F6', borderRadius: 10, padding: '7px 10px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#191C32' }}>{s.val}</span>
+                  <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="#CED0DE" strokeWidth="1.8" strokeLinecap="round">
+                    <path d="M1 1l4 4 4-4"/>
+                  </svg>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        padding: '10px 20px',
+        background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(12px)',
+        borderTop: '1px solid #E5E7F3',
+        display: 'flex', gap: 8, justifyContent: 'flex-end',
+        zIndex: 1, flexShrink: 0, position: 'relative',
+      }}>
+        <div style={{
+          padding: '9px 20px', borderRadius: 40, background: '#F3F5F6',
+          fontSize: 13, fontWeight: 500, color: '#191C32', cursor: 'pointer',
+        }}>취소</div>
+        <div style={{
+          padding: '9px 24px', borderRadius: 40, background: '#9F9DF3',
+          fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(159,157,243,0.3)',
+        }}>저장 및 토론 시작</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   STATS PLACEHOLDER
+   ───────────────────────────────────────────── */
+function StatsScreen() {
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F3F5F6', flexDirection: 'column', gap: 14 }}>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#EBECFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#767DFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="20" x2="18" y2="10"/>
+          <line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: '#191C32' }}>통계</div>
+      <div style={{ fontSize: 13, fontWeight: 500, color: '#93949A' }}>준비 중입니다.</div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   APP
+   ───────────────────────────────────────────── */
+function App() {
+  const [activeNav, setActiveNav] = React.useState('chat');
+
+  const screenMap = {
+    chat: <ErdChatScreen />,
+    settings: <ErdSettingsScreen />,
+    stats: <StatsScreen />,
+  };
+
+  return (
+    <div style={{
+      width: '100%', maxWidth: 1100, height: '100%', maxHeight: 700,
+      display: 'flex', borderRadius: 20, overflow: 'hidden',
+      boxShadow: '0 20px 80px rgba(55,62,125,0.14)',
+      background: '#F3F5F6',
+    }}>
+      <ErdSidebar activeNav={activeNav} onNav={setActiveNav} />
+      {screenMap[activeNav] || screenMap.chat}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
