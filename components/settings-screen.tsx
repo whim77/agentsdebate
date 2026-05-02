@@ -1,37 +1,45 @@
 'use client';
 
-import { MODELS } from '@/lib/types';
+import { MODELS, MODEL_VERSION_LIST } from '@/lib/types';
+import type { ModelVersions } from '@/lib/types';
 import { ModelPill } from './model-pill';
 
 interface Props {
   activeModels: ('gpt' | 'claude' | 'gemini')[];
   onToggle: (id: 'gpt' | 'claude' | 'gemini') => void;
+  modelVersions: ModelVersions;
+  onVersionChange: (id: 'gpt' | 'claude' | 'gemini', version: string) => void;
 }
 
-export function SettingsScreen({ activeModels, onToggle }: Props) {
+export function SettingsScreen({ activeModels, onToggle, modelVersions, onVersionChange }: Props) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', background: '#F3F5F6' }}>
       <div style={{ maxWidth: 560, margin: '0 auto' }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: '#191C32', marginBottom: 6 }}>모델 설정</div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: '#93949A', marginBottom: 28 }}>토론에 참여할 AI 모델을 선택하세요. 최소 2개 이상 필요합니다.</div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#93949A', marginBottom: 28 }}>토론에 참여할 AI 모델을 선택하고 세부 버전을 지정하세요. 최소 2개 이상 필요합니다.</div>
 
         {/* Model toggles */}
         <div style={{ background: '#FFFFFF', borderRadius: 20, boxShadow: '0 4px 20px rgba(55,62,125,0.06)', overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #E5E7F3' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#93949A', textTransform: 'uppercase', letterSpacing: 0.5 }}>참여 모델</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#93949A', textTransform: 'uppercase', letterSpacing: 0.5 }}>참여 모델 및 버전</div>
           </div>
           {MODELS.map((model, i) => {
             const active = activeModels.includes(model.id);
             const isLast = i === MODELS.length - 1;
+            const versions = MODEL_VERSION_LIST[model.id];
+            const currentVersion = modelVersions[model.id];
+            const currentLabel = versions.find(v => v.value === currentVersion)?.label ?? currentVersion;
+
             return (
               <div
                 key={model.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '16px 20px',
+                  padding: '14px 20px',
                   borderBottom: isLast ? 'none' : '1px solid #E5E7F3',
                   cursor: 'pointer',
                   transition: 'background 0.1s',
+                  opacity: active ? 1 : 0.5,
                 }}
                 onClick={() => {
                   if (active && activeModels.length <= 2) return;
@@ -39,9 +47,45 @@ export function SettingsScreen({ activeModels, onToggle }: Props) {
                 }}
               >
                 <ModelPill model={model} size={36} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#191C32', marginBottom: 2 }}>{model.name}</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#93949A' }}>{model.apiModel}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#191C32', marginBottom: 6 }}>{model.name}</div>
+                  {/* Version selector */}
+                  <div
+                    style={{ display: 'inline-flex', alignItems: 'center', position: 'relative' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <select
+                      value={currentVersion}
+                      onChange={e => onVersionChange(model.id, e.target.value)}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: model.color,
+                        background: model.bg,
+                        border: 'none',
+                        borderRadius: 20,
+                        padding: '4px 24px 4px 10px',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        minWidth: 120,
+                        maxWidth: 200,
+                      } as React.CSSProperties}
+                    >
+                      {versions.map(v => (
+                        <option key={v.value} value={v.value}>{v.label}</option>
+                      ))}
+                    </select>
+                    {/* Chevron icon */}
+                    <svg
+                      width="10" height="10" viewBox="0 0 10 10" fill="none"
+                      style={{ position: 'absolute', right: 8, pointerEvents: 'none' }}
+                    >
+                      <path d="M2 3.5l3 3 3-3" stroke={model.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
                 </div>
                 <Toggle on={active} color={model.color} />
               </div>

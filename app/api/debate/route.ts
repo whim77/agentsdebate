@@ -10,7 +10,7 @@ function encode(event: DebateEvent): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { topic, models } = await req.json();
+  const { topic, models, modelVersions, roundRobin, priorConsensus } = await req.json();
 
   if (!topic || typeof topic !== 'string') {
     return new Response(JSON.stringify({ error: '토론 주제가 필요합니다.' }), { status: 400 });
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        for await (const event of runDebate(topic, activeModels)) {
+        for await (const event of runDebate(topic, activeModels, modelVersions, !!roundRobin, priorConsensus ?? [])) {
           push(event);
           if (event.type === 'done') break;
         }

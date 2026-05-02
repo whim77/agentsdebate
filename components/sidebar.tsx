@@ -1,23 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import { MODELS } from '@/lib/types';
+import type { DebateRecord } from '@/lib/db';
 import { ModelPill } from './model-pill';
-
-const HIST = [
-  { title: 'AGI는 2030년에 달성될까?',   models: ['gpt','claude','gemini'] as const, active: true },
-  { title: '원격근무 vs 오피스 근무',     models: ['gpt','claude'] as const },
-  { title: '기후변화 대응 방안',          models: ['gpt','claude','gemini'] as const },
-  { title: '블록체인의 미래',             models: ['claude','gemini'] as const },
-];
 
 interface SidebarProps {
   activeNav: string;
   onNav: (nav: string) => void;
   onNewDebate: () => void;
+  onSelectDebate: (record: DebateRecord) => void;
+  onDeleteDebate?: (id: string) => void;
+  onClearHistory?: () => void;
+  history: DebateRecord[];
+  activeDebateId?: string;
 }
 
-export function Sidebar({ activeNav, onNav, onNewDebate }: SidebarProps) {
+export function Sidebar({ activeNav, onNav, onNewDebate, onSelectDebate, onDeleteDebate, onClearHistory, history, activeDebateId }: SidebarProps) {
   const modelMap = Object.fromEntries(MODELS.map(m => [m.id, m]));
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
     <div style={{
@@ -71,18 +72,68 @@ export function Sidebar({ activeNav, onNav, onNewDebate }: SidebarProps) {
 
       {/* History */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: '#93949A', padding: '0 4px', marginBottom: 6 }}>최근 토론</div>
-        {HIST.map((item, i) => (
-          <div key={i} style={{
-            padding: '9px 10px', borderRadius: 14, marginBottom: 4, cursor: 'pointer',
-            background: item.active ? '#EBECFF' : 'transparent',
-          }}>
-            <div style={{ fontSize: 12, fontWeight: item.active ? 700 : 500, color: item.active ? '#767DFF' : '#191C32', marginBottom: 5, lineHeight: 1.35 }}>{item.title}</div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {item.models.map((mid, j) => <ModelPill key={j} model={modelMap[mid]} size={18} />)}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#93949A' }}>최근 토론</span>
+          {history.length > 0 && onClearHistory && (
+            <button
+              onClick={onClearHistory}
+              style={{ fontSize: 10, fontWeight: 600, color: '#C5C6D0', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6 }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#F04086')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#C5C6D0')}
+            >
+              전체 삭제
+            </button>
+          )}
+        </div>
+        {history.length === 0 && (
+          <div style={{ padding: '12px 10px', fontSize: 12, fontWeight: 500, color: '#C5C6D0', textAlign: 'center' }}>
+            아직 토론 기록이 없습니다
           </div>
-        ))}
+        )}
+        {history.map((item) => {
+          const isActive = item.id === activeDebateId;
+          const isHovered = hoveredId === item.id;
+          return (
+            <div
+              key={item.id}
+              data-history-id={item.id}
+              onClick={() => onSelectDebate(item)}
+              onMouseEnter={() => setHoveredId(item.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{
+                position: 'relative', padding: '9px 10px', borderRadius: 14, marginBottom: 4, cursor: 'pointer',
+                background: isActive ? '#EBECFF' : isHovered ? '#F3F5F6' : 'transparent',
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, color: isActive ? '#767DFF' : '#191C32', marginBottom: 5, lineHeight: 1.35, paddingRight: 20 }}>
+                {item.turns?.[0]?.topic ?? '(알 수 없음)'}
+                {item.turns?.length > 1 && (
+                  <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 700, color: '#9F9DF3', background: '#EBECFF', padding: '1px 6px', borderRadius: 10 }}>
+                    +{item.turns.length - 1}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {item.models.map((mid, j) => modelMap[mid] ? <ModelPill key={j} model={modelMap[mid]} size={18} /> : null)}
+              </div>
+              {isHovered && onDeleteDebate && (
+                <button
+                  aria-label="토론 삭제"
+                  onClick={e => { e.stopPropagation(); onDeleteDebate(item.id); }}
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: '#F04086', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, color: '#fff', fontWeight: 700, lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Bottom nav */}
